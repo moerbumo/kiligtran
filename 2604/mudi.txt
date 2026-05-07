@@ -10,3 +10,8 @@
 ※既存の40サービスの全量ビルド（1〜2時間）をスキップし、本POC環境を数分で高速デプロイするため、あえて一時的に `build.sh` をコメントアウトするハックを入れています。
 ※この変更により、既存の40サービスはCloudFormationの冪等性により「更新なし」として安全にスキップされます。
 ※PoCの動作検証（トラフィック切り替え等）が完了次第、速やかに本PRの変更を元に戻す（Revert）PRを作成いたします。
+
+aws cloudformation describe-change-set \
+  --change-set-name PipelineChange \
+  --stack-name dev-cmpf-channeladapter-mail-poc \
+  --region ap-northeast-1 \
