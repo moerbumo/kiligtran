@@ -1,0 +1,83 @@
+    // ... [上面创建 TG-Blue, TG-Green, TaskDefinition 的代码保持不变] ...
+
+    // 1. 创建原生蓝绿专属的 IAM 角色（赋予 ECS 修改 ALB 的权力）
+    const ecsInfraRole = new iam.Role(this, 'EcsBGBootstrapRole', {
+      assumedBy: new iam.ServicePrincipal('ecs.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonECSInfrastructureRolePolicyForLoadBalancers'),
+      ],
+      // 博主的避坑经验：官方文档漏了这两个内联策略，必须手动补上！
+      inlinePolicies: {
+        ModifyTargetGroup: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: ['elasticloadbalancing:RegisterTargets', 'elasticloadbalancing:DeregisterTargets'],
+              resources: [targetGroupBlue.targetGroupArn, targetGroupGreen.targetGroupArn],
+            }),
+            new iam.PolicyStatement({
+              actions: ['elasticloadbalancing:DescribeTargetGroups', 'elasticloadbalancing:DescribeTargetHealth'],
+              resources: ['*'],
+            }),
+          ],
+        }),
+      },
+    });
+
+    // 2. ALB 监听器和规则 (先建好，因为后面要取它的 ARN)
+    const sg = ec2.SecurityGroup.fromSecurityGroupId(this, 'SecurityGroup', envConfig.AlbSecurityGroupId);
+    const listener = elb.ApplicationListener.fromApplicationListenerAttributes(this, 'Listener', {
+      listenerArn: envConfig.AlbListenerArn,
+      securityGroup: sg,
+    });
+    
+    const listenerRule = new elb.ApplicationListenerRule(this, 'ListenerRule', {
+      listener,
+      priority: albListenerRulePriority,
+      conditions: [elb.ListenerCondition.pathPatterns([`${apiPath}*`])],
+      action: elb.ListenerAction.weightedForward([
+        { targetGroup: targetGroupBlue, weight: 100 },
+        { targetGroup: targetGroupGreen, weight: 0 }
+      ]),
+    });
+
+    // 3. 创建 ECS Service
+    const healthCheckGracePeriod = (targetContainer === 'cmpf_splitter') || (targetContainer === 'cmpf_service') ? 400 : 300;
+    const service = new ecs.FargateService(this, 'Service', {
+      serviceName: `${targetContainer}-${pocPrefix}-svc`,
+      cluster,
+      taskDefinition,
+      desiredCount: ecsTaskDesireCount,
+      vpcSubnets: { subnets: envConfig.ECSService.Subnets.map((id, index) => ec2.Subnet.fromSubnetId(this, `Subnet${index}`, id)) },
+      securityGroups: envConfig.ECSService.SecurityGroups.map((id, index) =>
+        ec2.SecurityGroup.fromSecurityGroupId(this, `SecurityGroup${index}`, id)
+      ),
+      healthCheckGracePeriod: Duration.seconds(healthCheckGracePeriod),
+      propagateTags: ecs.PropagatedTagSource.SERVICE,
+      minHealthyPercent: 100,
+      deploymentController: { type: ecs.DeploymentControllerType.ECS }, // 启用原生
+    });
+
+    // 🚨 【极其重要】彻底删除 targetGroupBlue.addTarget(service); 这一行！
+    // 在高级原生蓝绿中，挂载动作完全移交到底层的 loadBalancers 属性配置中！
+
+    // 4. 【终极逃生舱】注入博主的精髓：AdvancedConfiguration
+    const cfnService = service.node.defaultChild as ecs.CfnService;
+    
+    // 追加蓝绿策略
+    cfnService.addPropertyOverride('DeploymentConfiguration.Strategy', 'BLUE_GREEN');
+    cfnService.addPropertyOverride('DeploymentConfiguration.DeploymentCircuitBreaker', { Enable: true, Rollback: true });
+    
+    // 强制覆盖 LoadBalancers，注入“备胎 TG”和“修改权限”
+    cfnService.addPropertyOverride('LoadBalancers', [
+      {
+        targetGroupArn: targetGroupBlue.targetGroupArn, // 现行系
+        containerName: `${targetContainer}-container`,  // 必须与 TaskDef 里的容器名完全一致！
+        containerPort: 8080,
+        advancedConfiguration: {
+          alternateTargetGroupArn: targetGroupGreen.targetGroupArn, // 待机系（备胎）
+          productionListenerRule: listenerRule.listenerRuleArn, // 要修改的路由规则
+          roleArn: ecsInfraRole.roleArn // 赐予 ECS 篡位的宝剑
+          // (因为你不要 Dark Canary，所以删掉了 testListenerRule)
+        }
+      }
+    ]);
