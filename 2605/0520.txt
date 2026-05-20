@@ -1,0 +1,7 @@
+【連携必須事項】
+1. APIGW の routeUrl を /v1/ に固定化する場合、
+   同時に以下の改修が完了していること必須：
+   ・Infra層：ALB Listener Rule のパスマッチングを /ais/cmpf_service/v1/* へ統一
+   ・App層：@RequestMapping のパスを /v1/... へ統一、環境変数 cmpf.application.version のルーティング依存を排除
+2. 本改修は単独でリリースせず、Infra/App 改修と同一パイプラインで統合リリースすること。
+3. リリース後は旧バージョンパス（/v1aXX/...）へのアクセスを 404 で拒否するよう ALB/WAF にて制御。
