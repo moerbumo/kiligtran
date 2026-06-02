@@ -18,7 +18,7 @@ STG / PRD では patch / minor version up の場合でも常に BLUE_GREEN_DEPLO
 ="env.dev" & CHAR(10) & "APP_VERSION=" & V12 & CHAR(10) & "APP_DETAIL_VERSION=" & "[ " & TEXTJOIN(", ", TRUE, """" & $K$9:$R$9 & """: """ & $K$12:$R$12 & """") & " ]" & CHAR(10) & "BLUE_GREEN_DEPLOY_FLAG=" & S12 & CHAR(10) & "TARGET=" & IF(LEFT(T12,1)="""", T12, """" & T12 & """")
 
 
-
+="APP_VERSION=" & AD12 & CHAR(10) & "APP_DETAIL_VERSION={" & TEXTJOIN(", ", TRUE, CHAR(34) & FILTER($L$9:$S$9, $L$12:$S$12<>"") & CHAR(34) & ":" & CHAR(34) & FILTER($L$12:$S$12, $L$12:$S$12<>"") & CHAR(34)) & "}" & CHAR(10) & "BLUE_GREEN_DEPLOY_FLAG=" & AB12 & CHAR(10) & "TARGET=" & AC12
 
 
 
