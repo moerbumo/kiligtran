@@ -12,3 +12,30 @@ A/B 面固定化自体もまだ実装前であり、ECS native Blue/Green と有
 
 ③ 運用としては、ご提案の通り、BLUE_GREEN_DEPLOY_FLAG=0 を利用可能とするのは開発環境のみに制限します。
 STG / PRD では patch / minor version up の場合でも常に BLUE_GREEN_DEPLOY_FLAG=1 とし、APIGateway 前段の TG 切替を実施する方針とします。
+
+
+
+="env.dev" & CHAR(10) & "APP_VERSION=" & V12 & CHAR(10) & "APP_DETAIL_VERSION=" & "[ " & TEXTJOIN(", ", TRUE, """" & $K$9:$R$9 & """: """ & $K$12:$R$12 & """") & " ]" & CHAR(10) & "BLUE_GREEN_DEPLOY_FLAG=" & S12 & CHAR(10) & "TARGET=" & IF(LEFT(T12,1)="""", T12, """" & T12 & """")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
