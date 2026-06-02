@@ -1,0 +1,14 @@
+ご指摘ありがとうございます。
+
+① はい、BLUE_GREEN_DEPLOY_FLAG=0 の場合、ECS Service のデプロイ方式は Rolling Update になります。
+
+② Adapter の旧タスク削除は、旧 MQ の message が処理完了するまで待つ必要がある、という点はご認識の通りです。
+
+ただし、ECS native Blue/Green への変更については、現在計画している A/B 面固定化とは別の新しいアーキテクチャ方針になると考えています。
+A/B 面固定化自体もまだ実装前であり、ECS native Blue/Green と有効に併用できるかは未調査・未検証です。
+特に、両方式とも流量制御および Target Group 制御に関係するため、組み合わせると制御が複雑になる可能性があります。
+
+そのため、現時点では ECS native Blue/Green への変更ではなく、A/B 面固定化方針を前提に進めたいと考えています。
+
+③ 運用としては、ご提案の通り、BLUE_GREEN_DEPLOY_FLAG=0 を利用可能とするのは開発環境のみに制限します。
+STG / PRD では patch / minor version up の場合でも常に BLUE_GREEN_DEPLOY_FLAG=1 とし、APIGateway 前段の TG 切替を実施する方針とします。
