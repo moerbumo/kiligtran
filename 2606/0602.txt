@@ -20,7 +20,11 @@ STG / PRD では patch / minor version up の場合でも常に BLUE_GREEN_DEPLO
 
 ="APP_VERSION=" & AD12 & CHAR(10) & "APP_DETAIL_VERSION={" & TEXTJOIN(", ", TRUE, CHAR(34) & FILTER($L$9:$S$9, $L$12:$S$12<>"") & CHAR(34) & ":" & CHAR(34) & FILTER($L$12:$S$12, $L$12:$S$12<>"") & CHAR(34)) & "}" & CHAR(10) & "BLUE_GREEN_DEPLOY_FLAG=" & AB12 & CHAR(10) & "TARGET=" & AC12
 
-
+=LET(
+    latest_row, COUNTA($J$16:$J$100) + 15,
+    latest_values_range, INDIRECT("L" & latest_row & ":S" & latest_row),
+    "APP_DETAIL_VERSION={" & TEXTJOIN(", ", TRUE, CHAR(34) & FILTER($L$9:$S$9, latest_values_range <> "") & CHAR(34) & ":" & CHAR(34) & FILTER(latest_values_range, latest_values_range <> "") & CHAR(34)) & "}"
+)
 
 
 
