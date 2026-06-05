@@ -1,0 +1,57 @@
+flowchart LR
+    subgraph CI_CD [CI/CD パイプライン]
+        direction TB
+        User((開発担当者)) -->|コミット| CC[CodeCommit]
+        CC --> CP[CodePipeline]
+        CP --> CB[CodeBuild]
+        CB -->|Cfnテンプレート| S3[(S3)]
+        S3 --> CF[CloudFormation]
+        CB -->|イメージ| ECR[(ECR)]
+    end
+
+    subgraph Deploy_Target [デプロイ対象 (非稼働面: 例B面)]
+        direction TB
+        CF -->|デプロイ①<br>アプリ/Lambda/ALB設定| APIGW_B_Deploy[APIGW_B<br>(新バージョン)]
+        CF -->|デプロイ①| Lambda[Lambda関数<br>(ログ連携/Authorizer)]
+        CF -->|デプロイ①| ECS_B[ECSサービス_B<br>(タスク定義更新)]
+    end
+
+    subgraph Production [本番環境 (A/B面固定)]
+        direction TB
+
+        ExtALB[External ALB<br>(最上位ルーティング)]
+
+        subgraph APIGW_Layer [API Gateway 層]
+            APIGW_A[APIGW_A<br>(リリースver)]
+            APIGW_B[APIGW_B<br>(旧ver)]
+        end
+
+        subgraph Internal_ALB [Internal ALB 層]
+            LA[リスナー_A]
+            LB[リスナー_B]
+            TGA[TG-A<br>(リリースver)]
+            TGB[TG-B<br>(旧ver)]
+        end
+
+        subgraph Fargate_Layer [Fargate 層]
+            FA[Fargate A<br>(リリースver環境)]
+            FB[Fargate B<br>(旧ver環境)]
+        end
+    end
+
+    %% 流量切换逻辑 (Deploy ②)
+    ExtALB ==>|デプロイ② トラフィック切替| APIGW_A
+    ExtALB -.->|旧トラフィック| APIGW_B
+
+    %% 内部路由逻辑
+    APIGW_A --> LA --> TGA --> FA
+    APIGW_B --> LB --> TGB --> FB
+
+    %% 样式定义
+    classDef newVer fill:#d4edda,stroke:#28a745,stroke-width:2px;
+    classDef oldVer fill:#f8d7da,stroke:#dc3545,stroke-width:1px,stroke-dasharray: 5 5;
+    classDef pipeline fill:#e2e3e5,stroke:#383d41;
+
+    class APIGW_A,FA,TGA,LA,APIGW_B_Deploy,ECS_B,Lambda newVer;
+    class APIGW_B,FB,TGB,LB oldVer;
+    class CI_CD,Deploy_Target pipeline;
