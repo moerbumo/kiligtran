@@ -1,0 +1,49 @@
+# 在PowerShell中执行
+netstat -ano | findstr "LISTENING" | findstr ":80 :443 :8080 :8443 :3000 :5000 :9000"
+
+
+# 查看AWS配置
+aws configure list
+
+# 查看EKS集群
+aws eks list-clusters
+
+# 查看kubectl配置
+kubectl config get-contexts
+
+
+echo $env:JAVA_HOME
+where java
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
