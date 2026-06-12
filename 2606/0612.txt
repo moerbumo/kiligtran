@@ -1,0 +1,54 @@
+```markdown
+# CMPF Project Architecture & Context
+
+## 1. Core Architecture Principles (架构方针)
+*   **Fixed Dual Stack (インフラ固定デュアルスタック)**:
+    *   Infrastructure is permanently deployed in two sets: **Side A** and **Side B**.
+    *   Resources are NOT created/destroyed per release.
+*   **No Versioning in Resource Names (去版本号)**:
+    *   Resource names (ECS, ALB, Lambda, Alarm) must **NOT** contain `APP_VERSION`.
+    *   Resource names **MUST** contain `TARGET` (A or B) to identify the side.
+    *   *Example*: `cmpf_service_dev_A` (instead of `cmpf_service_dev_v1.0`).
+*   **Blue/Green Deployment via Traffic Switching**:
+    *   Deploy code to the **Inactive Side** (e.g., Side B).
+    *   Switch traffic via **External ALB** / **API Gateway** from Active (A) to Inactive (B).
+*   **CDK Management**:
+    *   All resources (including ALB, APIGW, TG) should be managed by CDK to avoid conflicts with CloudFormation.
+
+## 2. Current Task: Issue 2 (课题2) - Alarm Dual Stack POC
+
+### Problem Statement
+*   **Current State**: Alarms are a single stack updated in-place.
+*   **Issue**: During release, there is a "Monitoring Gap" (approx. 1 min).
+    *   Sequence: Switch Alarm -> Switch Traffic.
+    *   Result: Old environment loses monitoring before traffic is cut; New environment has no monitoring until traffic arrives.
+
+### Solution Strategy: Alarm Two-Sided Transformation (Alarm两面化)
+*   **Goal**: Deploy **Alarm_A** (monitoring Side A) and **Alarm_B** (monitoring Side B) simultaneously.
+*   **POC Approach**: Use this task as a Proof of Concept (POC) for the full architecture migration.
+
+### Implementation Phases (分步实施)
+*   **Phase 1: Current Task (Alarm Stack Modification)**
+    *   **Action**: Modify `lib/alarm-stack.ts`.
+    *   **Naming**: Remove version, add `TARGET` (e.g., `Alarm_Service_A`, `Alarm_Service_B`).
+    *   **Deployment**: Deploy both stacks.
+    *   **Constraint**: Since ECS/ALB are not yet modified (still versioned/generic), the **Metric Dimensions** might temporarily point to the generic/active resource or use a shared config.
+    *   **Acceptance**: It's okay if Alarm_A and Alarm_B technically monitor the same underlying resource *for now*. The goal is to verify the **Dual Stack Deployment Pipeline**.
+*   **Phase 2: Future Task (ECS/ALB Modification)**
+    *   **Action**: Modify ECS/ALB to be Side-specific (A/B).
+    *   **Binding**: Update Alarm Metric Dimensions to strictly bind to the corresponding side (Alarm_A -> ECS_A).
+
+## 3. CDK Project Structure
+*   **Entry**: `cdk/bin/cdk.ts` -> reads `.env` -> calls `applicationStacks`.
+*   **Orchestration**: `cdk/bin/application-stacks.ts` (Passes `appVersion`, `appDetailVersion`, `target` to stacks).
+*   **Key Files for Issue 2**:
+    *   `lib/alarm-stack.ts`: Definition of CloudWatch Alarms.
+    *   `lib/names.ts`: `generateStackName` / `generateAlarmName` (Need to remove version logic).
+    *   `lib/application-stack.ts`: Where `AlarmStack` is instantiated (Needs to loop for A/B or pass `target`).
+
+## 4. Key Variables (ENV)
+*   `ENV`: dev / stg / prd
+*   `APP_VERSION`: Global version (e.g., `v1a55`) - *To be removed from resource names eventually.*
+*   `APP_DETAIL_VERSION`: JSON string of component versions (e.g., `{"splitter": "51.2.0"}`).
+*   `TARGET`: "A" or "B" (Used for resource naming).
+```
