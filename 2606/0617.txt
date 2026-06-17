@@ -10,3 +10,43 @@
 実際のコード構成の全体像につきましては、そちらのPRにて改めて富田さんにレビューとご指導をお願いできればと存じます。
 
 引き続き、よろしくお願いいたします。
+
+
+@echo off
+chcp 65001
+setlocal enabledelayedexpansion
+
+set TARGET_BRANCH=app_version_up_dev
+
+echo 开始处理项目...
+echo.
+
+for /d %%i in (*) do (
+    if exist "%%i\.git" (
+        echo 检查: %%i
+        cd %%i
+        
+        :: 检查远程分支
+        git fetch --all >nul 2>&1
+        git branch -r | findstr /c:"origin/%TARGET_BRANCH%" >nul 2>&1
+        
+        if errorlevel 1 (
+            :: 没有分支，移出去
+            echo   [移动] 无此分支，移出 Maven 文件夹...
+            cd ..
+            move "%%i" .. >nul
+        ) else (
+            :: 有分支，切换过去
+            echo   [切换] 切换到 %TARGET_BRANCH%...
+            git checkout %TARGET_BRANCH% >nul 2>&1
+            if errorlevel 1 (
+                echo   [警告] 切换失败
+            )
+            cd ..
+        )
+    )
+)
+
+echo.
+echo 处理完成！
+pause
