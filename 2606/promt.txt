@@ -1,0 +1,45 @@
+# CMPF Project Architecture & Context (Memory)
+
+## 1. Project Background (项目背景)
+*   **Domain**: AWS CDK (TypeScript) Infrastructure as Code.
+*   **Context**: 对日离岸开发项目 (Offshore Development for Japan)。团队沟通与代码注释需符合日文业务语境（N2-N1水平）。
+*   **Current Phase**: 基础设施由“单面覆盖发布”向“Blue/Green (A/B) 固定双面发布”演进的过渡期。
+
+## 2. Core Architecture Principles (核心架构方针)
+*   **Fixed Dual Stack (インフラ固定デュアルスタック化)**:
+    *   基础设施（VPC, ECS, ELB, LogGroup, Alarms 等）不再随版本号动态创建/销毁。
+    *   永远固定部署两套堆栈：**Side A (稼働面/非稼働面)** 和 **Side B (非稼働面/稼働面)**。
+*   **Naming Convention (命名脱敏)**:
+    *   **[STRICT RULE]**: 资源名称（Resource Names）必须彻底剥离 `appVersion`。
+    *   后缀统一使用 `_A` 或 `_B` (例如：`CmpfServiceStack_A`)。
+*   **Environment Injection (环境变量注入)**:
+    *   所有容器的环境变量必须显式注入 `TARGET='A'` 或 `TARGET='B'`，以便容器内部感知自身所属的面，并用于日志和监控的维度区分。
+
+## 3. Deployment Strategy & The "Paradox" (发布策略与双面状态控制)
+*   **The Big Bang (Baseline Deployment / 構築初期)**:
+    *   当前阶段的 `cdk deploy` 使用 `['A', 'B'].forEach` 循环，将**相同的版本**同时部署到 A 和 B 两面。
+    *   *目的*：建立固定的双面基础设施基线（Baseline）。这是刻意为之，不是 Bug。
+*   **Continuous Deployment (Differential B/G / 日常差分デプロイ)**:
+    *   **控制平面 (Control Plane)**：通过人工维护的 Excel (バージョン表) 确定非稼动面，并在 `.env` 文件中显式声明部署目标（如 `TARGET=A`）。
+    *   **Pipeline 行为 (Future Scope)**：Pipeline 读取 `.env`，CDK 必须根据 `TARGET` 变量执行**条件渲染**，仅将新版本（镜像/环境变量）更新到目标面，另一面保持原版本状态。
+
+## 4. Completed Milestones (已达成里程碑 - 前半段作业)
+*   **スタック定義改修 (Stack Definition Refactoring)**:
+    *   `names.ts`: 去除版本号，改为根据 `target` (A/B) 生成名称。
+    *   `application-stacks.ts`: 包裹 `forEach` 循环，实现 A/B 双栈同时实例化。
+    *   `alarm-stack.ts` & `metrics-filter-props.ts`: 监控指标脱离版本号，绑定到具体的 A/B TargetGroup。
+    *   **Dashboard**: 修改为同时展示 A 面和 B 面的监控图表。
+
+## 5. Upcoming Milestones (后续开发指南 - 后半段作业)
+*   **コンテナ改修 & パイプライン改修 (Container & Pipeline Refactoring)**:
+    *   **不要使用 AWS CLI 强刷镜像**（`aws ecs update-service`），因为无法更新环境变量。更新必须走 CDK。
+    *   需要改造 Pipeline 和 CDK 逻辑：打破 `forEach` 盲目双发，实现 `if (target === process.env.TARGET) { 注入新版本 } else { 维持旧版本 }` 的差分部署逻辑。
+*   **APIGW 连携**:
+    *   APIGW 的路由切换机制（Listener Rule Priority）由另一组负责。当前 CDK 中相关的 APIGW 切换代码已做兼容性脱敏（`@ts-ignore` 绕过版本检查），等待新架构彻底对接。
+
+## 6. Glossary (日文语境统一词汇表)
+*   **稼働面 (Active/Primary Face)**: 当前承担线上实际流量的环境。
+*   **非稼働面 (Inactive/Standby Face)**: 当前未承担线上流量，用于部署新版本的环境。
+*   **洗い替え (Full Replacement)**: 破坏性重建（旧架构的做法，现已废弃）。
+*   **差分デプロイ (Differential Deployment)**: 仅更新非稼动面的部署方式（新架构目标）。
+*   **環境変数 (Environment Variables)**: 注入容器的配置。
