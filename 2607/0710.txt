@@ -1,0 +1,22 @@
+ACTIVE_TARGET=$(aws ssm get-parameter \
+  --name "/cmpf/${ENV}/active_target" \
+  --query "Parameter.Value" \
+  --output text 2>/dev/null || echo "NONE")
+
+echo "APP_VERSION: ${APP_VERSION}"
+echo "ACTIVE_TARGET: ${ACTIVE_TARGET}"
+
+if [ -z "${APP_VERSION}" ]; then
+  echo "ERROR: APP_VERSION is empty."
+  exit 1
+fi
+
+if [ "${ACTIVE_TARGET}" != "A" ] && [ "${ACTIVE_TARGET}" != "B" ]; then
+  echo "ERROR: active_target is not managed by fixed A/B."
+  echo "ACTIVE_TARGET must be A or B, but was '${ACTIVE_TARGET}'."
+  echo "Please confirm migration status before legacy cleanup."
+  exit 1
+fi
+
+echo "active_target validation ok."
+echo "Legacy stack cleanup target: ${APP_VERSION}"
