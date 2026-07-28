@@ -1,0 +1,88 @@
+
+
+
+お疲れ様です。
+
+ALBのListener Ruleについて、1点確認させてください。
+
+ELBパラメータ設計書のNote欄には、Host Headerの書き換えのみが記載されています。
+一方、以前共有いただいたリクエスト変換の例では、Host Headerに加えて、PathにもAPI GatewayのStage名を付与するように見受けられました。
+
+例：
+・変換前
+  Host: api-dev.cmpf.jp
+  Path: /deliveryapi/...
+
+・変換後
+  Host: {API Gateway ID}.execute-api.ap-northeast-1.amazonaws.com
+  Path: /indeliapi/deliveryapi/...
+
+API Gateway側には `indeliapi`、`inwebapi` のStageが存在するため、現状はListener Ruleの初回作成時に、以下のTransformを設定する想定で実装しています。
+
+・Host Header Rewrite
+  `.*`
+  → `{API Gateway ID}.execute-api.ap-northeast-1.amazonaws.com`
+
+・URL Rewrite
+  Link／APIGW：
+  `^/(.*)$`
+  → `/indeliapi/$1`
+
+  Webhook：
+  `^/(.*)$`
+  → `/inwebapi/$1`
+
+A/B面の切り替え時は、Host HeaderのAPI Gateway IDのみを切り替え、Pathの設定は変更しない想定です。
+
+上記の理解で問題ないでしょうか。
+特に、設計書のNote欄にはHost Headerの書き換えのみが記載されているため、URL RewriteもListener Ruleに設定する必要があるか、ご確認いただけますと幸いです。
+
+よろしくお願いいたします。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
