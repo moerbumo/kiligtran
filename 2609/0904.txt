@@ -14,3 +14,5 @@
 ・/usr/local/src/script/ 配下へのスクリプトファイル配置（sudo cp 等）
 ・配置したテストスクリプトの実行
 お忙しいところ恐れ入りますが、ご確認およびご対応のほど、よろしくお願いいたします。
+
+for s in $(aws ecs list-services --cluster "FargateCluster-CMPF-Development" --query 'serviceArns[]' --output text | awk -F'/' '{print $NF}' | grep -E '^dev_.*_A$'); do aws ecs update-service --cluster "FargateCluster-CMPF-Development" --service "$s" --desired-count 0; done
